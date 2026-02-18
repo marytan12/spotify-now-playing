@@ -2878,7 +2878,7 @@
             });
 
             try {
-                const response = await fetch(`https://lyrics-plus-backend.vercel.app/v2/lyrics/get?${params.toString()}`);
+                const response = await fetch(`https://lyricsplus.binimum.org/v2/lyrics/get?${params.toString()}`);
                 if (!response.ok) throw new Error('Vercel API Error');
                 const data = await response.json();
                 if (!data || !data.lyrics) throw new Error('Letra no encontrada en Vercel');
