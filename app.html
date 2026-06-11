@@ -2850,50 +2850,27 @@
         // --- LYRICS LOGIC (Refactored for Preloading) ---
         async function fetchLyricsData(trackId, artist, title, album, durationMs) {
             if (state.lyricsCache.has(trackId)) return state.lyricsCache.get(trackId);
-            const durationSec = Math.round(durationMs / 1000);
-            let queryTitle = title;
-            let queryArtist = artist;
-            let queryAlbum = album;
 
             try {
-                const searchQuery = `${title} ${artist}`;
-                const searchRes = await fetch(`https://lyricsplus.prjktla.workers.dev/v1/songlist/search?q=${encodeURIComponent(searchQuery)}`);
-                if (searchRes.ok) {
-                    const searchData = await searchRes.json();
-                    if (Array.isArray(searchData) && searchData.length > 0) {
-                        const match = searchData[0];
-                        if (match.name) queryTitle = match.name;
-                        if (match.artist) queryArtist = match.artist;
-                        if (match.album) queryAlbum = match.album;
-                    }
-                }
-            } catch (e) { console.warn("Meta-search failed, using originals", e); }
-
-            const params = new URLSearchParams({
-                title: queryTitle,
-                artist: queryArtist,
-                album: queryAlbum || '',
-                duration: durationSec,
-                source: 'apple,lyricsplus,musixmatch,spotify,musixmatch-word'
-            });
-
-            try {
-                const response = await fetch(`https://lyricsplus.binimum.org/v2/lyrics/get?${params.toString()}`);
-                if (!response.ok) throw new Error('Vercel API Error');
+                const response = await fetch(`https://spotify-lyrics-api-eosin.vercel.app/?trackid=${trackId}`);
+                if (!response.ok) throw new Error('API Error');
                 const data = await response.json();
-                if (!data || !data.lyrics) throw new Error('Letra no encontrada en Vercel');
-                state.lyricsCache.set(trackId, data);
-                return data;
+                
+                if (data.error || !data.lines || data.lines.length === 0) {
+                     throw new Error('Letra no encontrada');
+                }
+                
+                const formattedLyrics = data.lines.map(line => ({
+                    time: parseInt(line.startTimeMs, 10),
+                    text: line.words
+                }));
+                
+                const finalData = { lyrics: formattedLyrics };
+                state.lyricsCache.set(trackId, finalData);
+                return finalData;
             } catch (error) {
-                try {
-                    console.warn("Primary API failed, trying fallback...", error);
-                    const fallbackResponse = await fetch(`https://lyricsplus.prjktla.workers.dev/v2/lyrics/get?${params.toString()}`);
-                    if (!fallbackResponse.ok) throw new Error('Secondary API Error');
-                    const fallbackData = await fallbackResponse.json();
-                    if (!fallbackData || !fallbackData.lyrics) throw new Error('Letra no encontrada en secundario');
-                    state.lyricsCache.set(trackId, fallbackData);
-                    return fallbackData;
-                } catch (fallbackError) { throw new Error("All sources failed"); }
+                console.error("Error fetching lyrics:", error);
+                throw new Error("All sources failed");
             }
         }
 
